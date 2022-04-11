@@ -1,5 +1,88 @@
 ---
 title: "Data Memo"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
+
+# Overview of the dataset
+```{r}
+housing <- read.csv("housing.csv")
+head(housing,10)
+```
+#### What does it include?
+
+The data pertains to the houses found in a given California district and some summary stats about them based on the 1990 census data
+
+
+#### Where and how will you be obtaining it? Include the link and source.
+
+The data was downloaded from Kaggle
+Link: https://www.kaggle.com/datasets/camnugent/california-housing-prices
+Source:This dataset appeared in a 1997 paper titled Sparse Spatial Autoregressions by Pace, R. Kelley and Ronald Barry, published in the Statistics and Probability Letters journal. They built it using the 1990 California census data.
+
+#### About how many observations? How many predictors?
+
+There are 20640 observation, and 8 predictors
+
+#### What types of variables will you be working with?
+
+Most of variables are numeric and ocean_proximity is character variable
+
+#### Is there any missing data? About how much? Do you have an idea for how to handle it?
+
+```{r}
+sum(is.na(housing))
+```
+There is 207 missing data. I am planning to remove the missing value.
+
+# Overview of the research question
+
+#### What variable(s) are you interested in predicting? What question(s) are you interested in answering?
+
+The variable I am interested in predicting is median house value.
+The question I am interested in answering are following:
++ what are some factors relate to the house pricing
++ Which model will predict the housing price most accurately
+
+#### Name your response/outcome variable(s) and briefly describe it/them.
+
+Response variable: median_house_value(The house median value in one census block group which typically has a population of 600 to 3000 people)
+
+#### Will these questions be best answered with a classification or regression approach?
+
+These questions be best answered with a regression approach
+
+#### Which predictors do you think will be especially useful?
+
+I think median_income and house_median_age will be especially useful
+
+#### Is the goal of your model descriptive, predictive, inferential, or a combination? Explain.
+
+My model will focus on prediction. I am planning to use machine learning method taught in class to predict California housing price and compare the 
+accuracy of different models.
+
+# Proposed project timeline
+
+#### When do you plan on having your data set loaded, beginning your exploratory data analysis, etc?
+
+I am planing to begin my exploratory data analysis next week and utilize different model based on class progress
+
+#### Provide a general timeline for the rest of the quarter.
+
+General timeline is based on class progress 
++ Week1-3  load and clean data
++ Week4-5  Exploratory data analysis 
++ Week6-8  Run models and get results 
++ Week9    Final edition
+
+# Questions and Concerns
+
+#### Are there any problems or difficult aspects of the project you anticipate?
+
+My current questions are 
+1. Are there many points in my data that can be analyzed
+2. Is it possible to change the data after I submitting data Memo
+
+
 
