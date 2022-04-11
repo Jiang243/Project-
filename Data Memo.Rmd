@@ -5,7 +5,7 @@ output:
   html_document: default
 ---
 
-# Overview of the dataset
+### Overview of the dataset
 ```{r}
 housing <- read.csv("housing.csv")
 head(housing,10)
@@ -36,7 +36,7 @@ sum(is.na(housing))
 ```
 There is 207 missing data. I am planning to remove the missing value.
 
-# Overview of the research question
+### Overview of the research question
 
 #### What variable(s) are you interested in predicting? What question(s) are you interested in answering?
 
@@ -62,7 +62,7 @@ I think median_income and house_median_age will be especially useful
 My model will focus on prediction. I am planning to use machine learning method taught in class to predict California housing price and compare the 
 accuracy of different models.
 
-# Proposed project timeline
+### Proposed project timeline
 
 #### When do you plan on having your data set loaded, beginning your exploratory data analysis, etc?
 
@@ -71,12 +71,12 @@ I am planing to begin my exploratory data analysis next week and utilize differe
 #### Provide a general timeline for the rest of the quarter.
 
 General timeline is based on class progress 
-+ Week1-3  load and clean data
-+ Week4-5  Exploratory data analysis 
-+ Week6-8  Run models and get results 
-+ Week9    Final edition
+- Week1-3  load and clean data
+- Week4-5  Exploratory data analysis 
+- Week6-8  Run models and get results 
+- Week9    Final edition
 
-# Questions and Concerns
+### Questions and Concerns
 
 #### Are there any problems or difficult aspects of the project you anticipate?
 
