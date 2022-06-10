@@ -1,0 +1,619 @@
+---
+title: "PSTAT 131 Final Project"
+author: "Dingan Jiang"
+date: "2022/5/25"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_float: yes
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      warning = FALSE)
+```
+
+# Introduction
+```{r}
+knitr::include_graphics("Picture1.jpg")
+```
+
+The housing crisis in UC Santa Barbara is a growing problem. Many students have difficulty seeking affordable housing. The average rent for a 1 bedroom apartment in UCSB, CA is currently 2798. This is a 61% increase compared to the previous year. The university plans to construct Muger Hall to accommodate more students and fulfill obligations mentioned in the 2010 Long Range Development Plan. However, the design of Muger Hall, which is windowless, caused many people controversy and opposition. Many media report this plan, and below is one of the reports. The housing issues in my school arise my interest in housing prices. After searching on the internet, I find one data set for California housing prices, and I could utilize the method learned in class to find out which variable relate to the housing price and employ different machine learning techniques to make a prediction of housing price.
+
+```{r}
+
+library("vembedr")
+embed_url("https://www.youtube.com/watch?v=9ZJSaqOWOqI")
+
+```
+
+## Goal of my project ##
+
+The main goal of this project is utilizing different machine learning models to predict median_house_value, and find the best-performance model. I may utilize this model to predict future housing price based on the newest data. Also, I plan to do some data visualization to find relationship among different variable especially median house value.
+
+
+## Loading Data and Packages ##
+
+**Loading Data**
+```{r}
+# read in data
+housing <- read.csv("housing.csv")
+head(housing)
+```
+The data pertains to the houses found in a given California district and some summary stats about them based on the 1990 census data. The data was downloaded from Kaggle Link: https://www.kaggle.com/datasets/camnugent/california-housing-prices Source:This dataset appeared in a 1997 paper titled Sparse Spatial Autoregressions by Pace, R. Kelley and Ronald Barry, published in the Statistics and Probability Letters journal. They built it using the 1990 California census data.
+
+Below are description of the variables in the data set and code book is also available on my github page.
+
++ longitude: A measure of how far west a house is; a higher value is farther west
++ latitude: A measure of how far north a house is; a higher value is farther north
++ housingMedianAge: Median age of a house within a block; a lower number is a newer building
++ totalRooms: Total number of rooms within a block
++ totalBedrooms: Total number of bedrooms within a block
++ population: Total number of people residing within a block
++ households: Total number of households, a group of people residing within a home unit, for a block
++ medianIncome: Median income for households within a block of houses (measured in *tens of thousands of US Dollars*)
++ medianHouseValue: Median house value for households within a block (measured in *US Dollars*)
++ oceanProximity: Location of the house w.r.t ocean/sea
+
+**Loading Package**
+
+Below are packages I plan to use in this project
+
+```{r}
+# load packages
+library(tidyverse)
+library(lubridate)
+library(tidymodels)
+library(janitor)
+library(naniar)
+library(corrr)
+library(gridExtra)
+library(randomForest)
+library(kknn)
+```
+
+
+# Data Cleaning # 
+
+The data cleaning part is organized by the following step
+1. Check missing value 
+2. Processing categorical varialbe
+
+**Check Missing Value**
+
+In this part, we plan to use vis_miss function in naniar package to visualizing the missing data
++The function vis_miss provides a summary of whether the data is missing or not. 
++It also provides the amount of missings in each columns.
+
+```{r}
+# use vis_miss function in naniar package to visualize the missing value
+vis_miss(housing)
+```
+
+I found only one variable total_bedrooms have missing value.
+
+```{r}
+# check the number of missing value
+total_bedrooms <- housing$total_bedrooms
+summary(total_bedrooms)
+```
+
+The total_bedrooms has 207 NA values. I consider using median of total_bedrooms to impute missing values.
+
+```{r}
+# using median of total_bedrooms to impute missing value
+housing <- housing %>% mutate(total_bedrooms = ifelse(is.na(total_bedrooms),
+                                                   median(total_bedrooms, na.rm = T),
+                                                   total_bedrooms))
+
+```
+
+Check if there is any missing value
+
+```{r}
+# Check if there is any missing value
+sum(is.na(housing))
+```
+
+After checking, we do not have any missing value in our data set. 
+
+
+Summary the whole data set 
+
+```{r}
+summary(housing)
+```
+
+
+**Categorical Variable**
+
+I notice that ocean_proximity is character variable and I want to change that to factor variable
+
+```{r}
+# change and show the levels of ocean_proximity
+housing$ocean_proximity <- as.factor(housing$ocean_proximity)
+levels(housing$ocean_proximity)
+```
+
+Ocean_proximity has 5 levels to illustrate location of the house with respect to ocean/sea.
+
+
+# Exploratory Data Analysis
+
+## Median House Value Visualization ##
+
+I plan to visualize the median house value based on house location (x = longitude, y = latitude). The dot shows the population density and color represents the median house value
+
+```{r}
+map_view <- housing %>% 
+  ggplot(aes(x = longitude, y = latitude, color = median_house_value)) +
+  geom_point(aes(size = population), alpha = 0.5) + 
+  scale_color_distiller(palette = "Spectral") +
+  xlab("Longitdue") + 
+  ylab("Latitude") + 
+  labs(title = "Median House Value Visualization", colour = "Median House Value", size = "Population")+
+  theme_minimal()
+
+map_view
+```
+
+By observing the Median House Value with respect to the location, I find that houses close to the ocean/sea have a higher median house value compared with inland houses. One reasonable explanation could be most metropolitan (LA Bay Area) is close to the ocean/sea. A large portion of the population lives in these areas, which may cause great demand for housing and pull up the median house value. Another possible reason could also be from the demand side. The houses close to the ocean/sea are more attractive with better living environments. Also interesting to note that the population density and median housing value inland are much smaller. Therefore, ocean_proximity may be an important predictor of median housing value, and I will focus on ocean_proximity in the following exploratory data analysis.
+
+
+## Histogram for ocean_proximity ##
+
+I plan to draw histogram for ocean_proximity
+
+```{r}
+housing %>% 
+  ggplot(aes(x = factor(ocean_proximity))) +
+  geom_histogram(stat = 'count', fill = "blue1") +
+  geom_text(aes(label = ..count..), stat = "count", vjust = -0.5, colour = "black") +
+  xlab("Ocean_proximity")+
+  ylab("Count")+
+  theme_minimal() 
+
+```
+
+By observing count of each level of Ocean_proximity, I find the observation of *ISLAND* is much less than other levels. *ISLAND* only have 5 observations and other levels have over than 2000 observations. Therefore, we may consider to remove level of *ISLAND* in model fitting, which may have subtle impact on our final model performance.
+
+
+## Boxplot for Median House Value ##
+
+```{r}
+housing[housing$ocean_proximity != "ISLAND", ] %>% 
+  ggplot(aes(factor(ocean_proximity), median_house_value)) +
+  geom_boxplot()+
+  xlab("Ocean_proximity")+
+  ylab("Median house value")+
+  theme_minimal()
+```
+
+The boxplot above can also show housings close to sea/ocean have higher median house value. Another interesting fact is that the minimum median housing value near the bay/ocean is larger than the maximum median housing value inland. From the analysis and visualization above, we could know location plays an important role in house value.
+
+
+## Corrlation Plot ##
+
+In this part, I use correlation plot to show the relationship of different variables in our data set
+
+```{r}
+cor_housing <- housing %>%
+  select(-c(longitude,latitude,total_bedrooms)) %>% 
+  select(where(is.numeric)) %>% 
+  correlate()
+
+cor_housing %>% 
+  stretch() %>% 
+  ggplot(aes(x,y,fill = r)) + 
+  geom_tile() + 
+  geom_text(aes(label = as.character(fashion(r))))
+
+```
+In the correlation plot above, I could know median_income and median_house_value have a positive correlation (0.69). This conforms to everyday perceptions: family with high median_income could afford more expensive house. Therefore, median income could be our second important variable to predict median_house_value.
+
+Some other correlation listed below:
+
++ household is positive correlate with total rooms and population
++ population is positive correlate with total rooms and total rooms
+
+
+
+## Distribution of median_housing value & income distribution ##
+
+Graph below are density estimation of median_housing value and income distribution and red line represents mean and blue line represents median.
+
+```{r}
+income <- housing %>% ggplot(aes(x = median_income)) +
+  geom_density(fill = 'blue', alpha = 0.7) +
+  geom_vline(aes(xintercept = mean(median_income)), 
+             color = "firebrick1", linetype = "dashed") +
+  geom_vline(aes(xintercept = median(median_income)), 
+             color = "blue2", linetype = "dashed") +
+  xlab("Median Income") +
+  labs(title = "Density estimation of median income") +
+  theme_minimal()
+```
+
+```{r}
+housing_value <- housing %>% ggplot(aes(x = median_house_value)) +
+  geom_density(fill = 'cadetblue1', alpha = 0.7) +
+  geom_vline(aes(xintercept = mean(median_house_value)), 
+             color = "firebrick1", linetype = "dashed") +
+  geom_vline(aes(xintercept = median(median_house_value)), 
+             color = "blue2", linetype = "dashed") +
+  xlab("Median House Value") +
+  labs(title = "Density estimation of median house value") +
+  theme_minimal()
+```
+
+
+```{r}
+grid.arrange(income, housing_value, ncol=2)
+```
+The distribution of Median Income and Median House Value seems both right-skewed with mean value larger than the median value. This may indicate the people's median income match people's median house value. One interest point is that in the density estimation of median house value there is one increasing tail. This may show only small portion of individuals with high median income own these luxuray housing.  
+ 
+
+# Data Spliting 
+
+The data was split in a 80% training, and 20% testing. We also strata median_house_value, which make sure that both side of the split have roughly the same distribution for each value of strata.
+
+```{r}
+# set seed so our result is reproducible
+set.seed(3435)
+
+housing_split <- housing %>% 
+  initial_split(prop = 0.8, strata = "median_house_value")
+
+housing_train <- training(housing_split)
+housing_test  <- testing(housing_split)
+
+```
+
+```{r}
+# checking dimension to verify that the correct number of observations are now in each data set
+c(dim(housing_train), dim(housing_test))
+```
+
+The training data set has 16510 observations, and test data set has 4130 observations. They both have desired number of observations.
+
+**v-fold cross-validation**
+
+Next, use v-fold cross-validation on the training set. Use 5 folds. Stratify the folds by median_house_value as well.
+
+```{r}
+housing_folds <- vfold_cv(housing_train, v = 5, strata = median_house_value)
+```
+
+
+
+# Model Building
+
+This part is organized by the following step:
+1. Building the model
+2. Running the model
+3. Analyzing the model
+
+
+## Building the recipe ##
+
+Set up a recipe to predict median_house_value with longitude, latitude, housing_median_age, total_rooms, total_bedrooms, population, households, median_income, ocean_proximity.
+
++ Dummy-code ocean_proximity
++ Center and scale all predictors
+
+
+```{r}
+housing_recipe <- recipe(median_house_value ~ 
+                           longitude + latitude + housing_median_age 
+                         + total_rooms + total_bedrooms 
+                         + population + households 
+                         + median_income + ocean_proximity, data = housing_train) %>% 
+  step_dummy(ocean_proximity) %>% 
+  step_center(all_predictors()) %>% 
+  step_scale(all_predictors())
+```
+
+
+## Preparing and Running the Models ##
+
+### Ridge Regression ###
+
+To begin, I use linear_reg() and mixture = 0 to specify a ridge model, and use the glmnet as engine. Because our prediction is numeric, so we set our mode as regression. Also, we set penalty = tune(). This tells tune_gune grid that the penalty parameter should be tuned.
+
+```{r}
+ridge_spec <- 
+  linear_reg(penalty = tune(), mixture = 0) %>% 
+  set_mode("regression") %>% 
+  set_engine("glmnet")
+
+ridge_workflow <- workflow() %>% 
+  add_recipe(housing_recipe) %>% 
+  add_model(ridge_spec)
+```
+
+Next, I set up the tuning grid with range from -5 to 5 and levels equal to 20
+
+```{r}
+penalty_grid <- grid_regular(penalty(range = c(-5, 5)), levels = 20)
+```
+
+Finally, I executed my model by tuning and fitting. 
+
+```{r}
+ridge_res <- tune_grid(
+  ridge_workflow,
+  resamples = housing_folds, 
+  grid = penalty_grid
+)
+```
+
+
+### Random Forest Model ### 
+
+Here, I plan to set random forest model. I plan to tune mtry and min_n, set mode to "regression", and use
+the ranger engine. I stored this model and my recipe in a workflow.
+
+```{r}
+rf_model <- 
+  rand_forest(
+    mtry = tune(),
+    min_n = tune(),
+    mode = "regression") %>% 
+  set_engine("ranger")
+
+
+
+rf_workflow <- workflow() %>% 
+  add_model(rf_model) %>% 
+  add_recipe(housing_recipe)
+```
+
+Next, I plan to set up the tuning grid. I set mtry ranges from 1 to 10, when we include all the predictors the model is bagging. The min_n ranges from 100 to 200. Also, considering the computation power, I set levels equal to 7.
+
+```{r}
+rf_grid <- grid_regular(mtry(range = c(1,10)),    
+                        min_n(range = c(100,200)), 
+                        levels = 7)  
+
+```
+
+Finally, I executed my model by tuning and fitting, and save the final result for future model 
+comparsion.
+
+```{r eval = FALSE}
+rf_tune <- tune_grid(
+  rf_workflow,
+  resamples = housing_folds,
+  grid = rf_grid,
+  metrics = metric_set(rmse)
+)
+
+save(rf_tune, rf_workflow, file = "rf_tune.rda")
+```
+
+
+### Boosted Tree ###
+
+Similarly, I set the boosted tree model and tune parameters mtry and learn_rate. I set engine as xgboost and create a workflow.
+
+```{r}
+bt_model <- boost_tree(mtry = tune(),
+                       learn_rate = tune()
+                       ) %>% 
+  set_engine("xgboost")
+
+bt_workflow <- workflow() %>% 
+  add_model(bt_model) %>% 
+  add_recipe(housing_recipe)
+```
+
+Next, I set up a tuning grid with the similar process like random forest model.
+
+```{r}
+bt_grid <- grid_regular(mtry(range = c(2,9)), 
+                        learn_rate(range = c(0.05,0.3)),
+                        levels = 5)
+
+```
+
+
+Finally, I executed the model and save the final result for future model comparison
+
+```{r}
+bt_tune <- tune_grid(
+  bt_workflow,
+  resamples = housing_folds,
+  grid = bt_grid,
+  metrics = metric_set(rmse)
+)
+
+save(bt_tune, bt_workflow, file = "bt_tune.rda")
+```
+
+
+
+### Nearest Neighbors ###
+
+In this part, I set Nearest Neighbors model. I plan to tune parameter neighbors and set model as regression and engine as kknn
+
+```{r}
+knn_model <- 
+  nearest_neighbor(
+    neighbors = tune(),
+    mode = "regression"
+  ) %>% set_engine("kknn")
+
+knn_workflow <- workflow() %>% 
+  add_model(knn_model) %>% 
+  add_recipe(housing_recipe)
+```
+
+Next, I set up the tuning grid
+
+```{r}
+knn_grid <- grid_regular(neighbors(range = c(1,10)),
+                        levels = 5)
+```
+
+Finally, I executed the model and save the final result for future model comparison
+
+```{r}
+knn_tune <- tune_grid(
+  knn_workflow,
+  grid = knn_grid,
+  resamples = housing_folds,
+  metrics = metric_set(rmse)
+)
+
+save(knn_tune, knn_workflow, file = "knn_tune.rda")
+```
+
+
+## Model Analysis ## 
+
+```{r}
+load("rf_tune.rda")
+load("bt_tune.rda")
+load("knn_tune.rda")
+```
+
+### Ridge Regression ###
+
+we utilize autoplot to create a visualization of our result
+
+```{r}
+autoplot(ridge_res)
+```
+We see that the amount of regularization affects the performance metrics differently.
+
+
+Here, we use select_by_one_std_err() which select the most simple model that is within in one standard error of the numerically optimal results.
+
+```{r}
+best_penalty <- select_by_one_std_err(ridge_res, penalty, metric = "rmse")
+best_penalty
+```
+
+We could use training data set to get the final train result and draw ggplot to know model performance
+```{r}
+ridge_final <- finalize_workflow(ridge_workflow, best_penalty)
+ridge_final_fit <- fit(ridge_final, data = housing_train)
+housing_train_res <- predict(ridge_final_fit, new_data = housing_train %>% select(-median_house_value))
+
+housing_train_res %>% 
+  ggplot(aes(x = .pred, y = housing_train$median_house_value)) +
+  geom_point(alpha = 0.2) +
+  geom_abline(lty = 2) + 
+  theme_bw() +
+  coord_obs_pred()
+```
+
++ The model does not do very well, the dot do not follow the straight line.
+
+
+### Random Forest ###
+
+we use autoplot function to visualize our model
+
+```{r}
+autoplot(rf_tune, metric = "rmse")
+```
+
++ It is clear that rmse decrease as the number of the predictors increase.
+
+
+Next, we also use select_by_one_std_err() which select the most simple model 
+
+```{r}
+select_by_one_std_err(rf_tune,mtry,metric = "rmse")
+```
+
+
+### Boosted Tree ###
+
+Use autoplot to visualize the model
+
+```{r}
+autoplot(bt_tune, metric = "rmse")
+```
+
++ The graph shows as the predictors increase our rmse decrease
+
+
+Next, we also use select_by_one_std_err() to select the model 
+
+```{r}
+select_by_one_std_err(bt_tune, mtry, metric = "rmse") 
+```
+
+### Nearest Neighbors ###
+
+Use autoplot to visualize our model
+
+```{r}
+autoplot(knn_tune, metric = "rmse")
+```
+
++ The graph shows as the # Nearest Neighbors increase, our rmse decrease
+
+
+Next, we also use select_by_one_std_err() to select the model
+```{r}
+select_by_one_std_err(knn_tune, neighbors , metric = "rmse") 
+```
+
+
+## Final Model Building ##
+
+After comparing the model I used above, Random Forest has the best performance. Therefore, I decide to use Random Forest as our Final Model.
+
+```{r}
+rf_workflow_tuned <- rf_workflow %>% 
+  finalize_workflow(select_by_one_std_err(rf_tune,mtry,metric = "rmse"))
+```
+
+Run the fit and then check our model performance
+
+```{r}
+rf_results <- fit(rf_workflow_tuned, housing_train)
+```
+
+
+## Test set Analysis ##
+
+Now, lets fit the model to the testing data set and check our model performance
+
+```{r}
+housing_metric <- metric_set(rmse)
+
+model_test_predictions <- predict(rf_results, new_data = housing_test) %>% 
+  bind_cols(housing_test %>% select(median_house_value)) 
+
+model_test_predictions %>% 
+  housing_metric(truth = median_house_value, estimate = .pred)
+```
+Our model's rmse is 53378 on our testing data set, which is close to the rmse on the training data set
+Thus, we do not have an overfitting issue and my model have a great performance
+
+
+# Conclusion # 
+
+The housing crisis at UCSB sparks my interest in exploring California housing prices. In this project, I utilized different plots and graphs to represent the correlation between each variable. 
+The focus of this project is using a cross-validation training set to train our machine learning model. Using these models, we could make predictions about housing median values. Through building and analyzing model performance, we find Random Forest has the best performance. Therefore, we employ Random Forest to fit our test set. The final result shows I have an acceptable Rmse value, which is also close to our training set. Our model has a great performance in predicting housing median values.
+
+However, there are still several limitations in my project. The data set is out of date, and I may find the most recent data to train my model to get reliable results. Next, I do not include other machine learning models, which may have better performance. I will try some other models when I learn more about machine learning.
+
+
+This quarter goes so fast. I really appreciate the effort made by our instructor Prof. Coburn and teaching assistant Hanmo Li to help me to explore this interesting topic. I enjoy the process of finishing this project and hope I could learn more to improve my project. Thanks again for people helping me this quarter. 
+
+# Reference #
++ https://www.kaggle.com/datasets/camnugent/california-housing-prices
++ https://michaeltopper1.github.io/data-wrangling-econ-book/cleaning-data-i.html#the-pipe
++ https://rpubs.com/ablythe/520912
++ https://gauchospace.ucsb.edu/courses/pluginfile.php/4550966/mod_resource/content/2/Final-Project.html#Model_Building
+
+
+
